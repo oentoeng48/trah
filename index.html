@@ -9,9 +9,9 @@
 <body>
 
 <div class="container">
-    <h1>Sistem Silsilah Keluarga Terintegrasi</h1>
+    <h1>Sistem Silsilah Keluarga (CRUD Lengkap)</h1>
 
-    <!-- Bagian Login Admin -->
+    <!-- Login Section -->
     <div id="login-section" class="card">
         <h2>Login Admin</h2>
         <input type="text" id="username" placeholder="Username">
@@ -20,60 +20,71 @@
         <p id="login-msg" style="color: red;"></p>
     </div>
 
-    <!-- Bagian Dashboard Admin (CRUD Lengkap) -->
+    <!-- Admin Dashboard (CRUD) -->
     <div id="dashboard-section" class="card hidden">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>Panel Kontrol Admin</h2>
+            <h2 id="form-title-mode">Tambah Anggota Keluarga</h2>
             <button onclick="logout()" style="background-color: #d9534f;">Logout</button>
         </div>
         <hr>
 
-        <!-- 1. Form Tambah Orang -->
-        <h3>1. Tambah Anggota Keluarga</h3>
+        <!-- Form Orang (Create & Update) -->
+        <input type="hidden" id="p_id">
+        <label>Nama Lengkap:</label>
         <input type="text" id="p_name" placeholder="Nama Lengkap">
+        <label>Jenis Kelamin:</label>
         <select id="p_gender">
             <option value="L">Laki-laki</option>
             <option value="P">Perempuan</option>
         </select>
-        <input type="date" id="p_birth" placeholder="Tanggal Lahir">
+        <label>Tanggal Lahir:</label>
+        <input type="date" id="p_birth">
+        <label>Tempat Lahir:</label>
         <input type="text" id="p_place" placeholder="Tempat Lahir">
+        <label>Status Hidup:</label>
         <select id="p_status">
             <option value="Hidup">Hidup</option>
             <option value="Meninggal">Meninggal</option>
         </select>
-        <button onclick="submitPerson()">Simpan Orang</button>
+        <br><br>
+        <button onclick="savePerson()" id="btn-save-person">Simpan Anggota Baru</button>
+        <button onclick="resetPersonForm()" style="background-color: #6c757d;" id="btn-cancel-person" class="hidden">Batal Edit</button>
 
-        <hr style="margin: 20px 0;">
+        <hr style="margin: 25px 0;">
 
-        <!-- 2. Form Tambah Pernikahan -->
-        <h3>2. Tambah Hubungan Pernikahan (Suami & Istri)</h3>
-        <label>Pilih Suami:</label>
+        <!-- Form Tambah Pernikahan -->
+        <h3>Tambah / Kelola Pernikahan</h3>
+        <label>Suami:</label>
         <select id="m_husband"><option value="">-- Pilih Suami --</option></select>
-        <label>Pilih Istri:</label>
+        <label>Istri:</label>
         <select id="m_wife"><option value="">-- Pilih Istri --</option></select>
-        <input type="date" id="m_date" placeholder="Tanggal Nikah">
+        <label>Tanggal Nikah:</label>
+        <input type="date" id="m_date">
+        <label>Status Pernikahan:</label>
         <select id="m_status">
             <option value="Aktif">Aktif</option>
             <option value="Cerai">Cerai</option>
             <option value="Pasangan Wafat">Pasangan Wafat</option>
         </select>
+        <br><br>
         <button onclick="submitMarriage()">Simpan Pernikahan</button>
 
-        <hr style="margin: 20px 0;">
+        <hr style="margin: 25px 0;">
 
-        <!-- 3. Form Tambah Anak ke Pernikahan -->
-        <h3>3. Hubungkan Anak ke Orang Tua (Pernikahan)</h3>
+        <!-- Form Hubungkan Anak -->
+        <h3>Hubungkan Anak ke Orang Tua</h3>
         <label>Pilih Pernikahan Orang Tua:</label>
         <select id="c_marriage"><option value="">-- Pilih Pernikahan --</option></select>
         <label>Pilih Anak:</label>
         <select id="c_child"><option value="">-- Pilih Anak --</option></select>
+        <br><br>
         <button onclick="submitChildRelation()">Simpan Relasi Anak</button>
     </div>
 
-    <!-- Bagian Tampilan Bagan Silsilah -->
+    <!-- Tampilan Silsilah & Daftar Anggota -->
     <div class="card">
-        <h2>Pohon / Bagan Silsilah Keluarga</h2>
-        <div id="tree-container">Memuat data silsilah...</div>
+        <h2>Daftar & Bagan Silsilah Keluarga</h2>
+        <div id="tree-container">Memuat data...</div>
     </div>
 </div>
 
@@ -92,6 +103,7 @@
                     localStorage.setItem('authToken', data.token);
                     toggleAdminView(true);
                     alert('Login Berhasil!');
+                    fetchDataAndRender(); // Refresh data setelah login agar tombol langsung muncul
                 } else {
                     document.getElementById('login-msg').innerText = data.message;
                 }
@@ -101,13 +113,13 @@
     function logout() {
         localStorage.removeItem('authToken');
         toggleAdminView(false);
+        fetchDataAndRender();
     }
 
     function toggleAdminView(isAdmin) {
         if(isAdmin) {
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('dashboard-section').classList.remove('hidden');
-            loadDropdownOptions();
         } else {
             document.getElementById('login-section').classList.remove('hidden');
             document.getElementById('dashboard-section').classList.add('hidden');
@@ -156,19 +168,57 @@
         data.marriages.forEach(m => {
             let suami = data.persons.find(p => p.person_id == m.husband_id)?.full_name || 'ID ' + m.husband_id;
             let istri = data.persons.find(p => p.person_id == m.wife_id)?.full_name || 'ID ' + m.wife_id;
-            marriageSelect.innerHTML += `<option value="${m.marriage_id}">Pernikahan #${m.marriage_id}: ${suami} & ${istri}</option>`;
+            marriageSelect.innerHTML += `<option value="${m.marriage_id}">Nikah #${m.marriage_id}: ${suami} & ${istri}</option>`;
         });
     }
 
-    function submitPerson() {
+    // SIMPAN / UPDATE PERSON
+    function savePerson() {
+        const id = document.getElementById('p_id').value;
         const payload = {
+            person_id: id,
             full_name: document.getElementById('p_name').value,
             gender: document.getElementById('p_gender').value,
             birth_date: document.getElementById('p_birth').value,
             birth_place: document.getElementById('p_place').value,
             status_hidup: document.getElementById('p_status').value
         };
-        sendPost('addPerson', payload);
+
+        const action = id ? 'updatePerson' : 'addPerson';
+        sendPost(action, payload);
+    }
+
+    function editPerson(id) {
+        const p = globalData.persons.find(item => item.person_id == id);
+        if(!p) return;
+
+        document.getElementById('p_id').value = p.person_id;
+        document.getElementById('p_name').value = p.full_name;
+        document.getElementById('p_gender').value = p.gender;
+        document.getElementById('p_birth').value = p.birth_date ? p.birth_date.split('T')[0] : '';
+        document.getElementById('p_place').value = p.birth_place;
+        document.getElementById('p_status').value = p.status_hidup;
+
+        document.getElementById('form-title-mode').innerText = "Edit Anggota: " + p.full_name;
+        document.getElementById('btn-save-person').innerText = "Perbarui Data";
+        document.getElementById('btn-cancel-person').classList.remove('hidden');
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+
+    function resetPersonForm() {
+        document.getElementById('p_id').value = '';
+        document.getElementById('p_name').value = '';
+        document.getElementById('p_birth').value = '';
+        document.getElementById('p_place').value = '';
+        document.getElementById('form-title-mode').innerText = "Tambah Anggota Keluarga";
+        document.getElementById('btn-save-person').innerText = "Simpan Anggota Baru";
+        document.getElementById('btn-cancel-person').classList.add('hidden');
+    }
+
+    function deletePerson(id) {
+        if(confirm("Yakin ingin menghapus data anggota ini?")) {
+            sendPost('deletePerson', { person_id: id });
+        }
     }
 
     function submitMarriage() {
@@ -179,6 +229,12 @@
             status_pernikahan: document.getElementById('m_status').value
         };
         sendPost('addMarriage', payload);
+    }
+
+    function deleteMarriage(id) {
+        if(confirm("Yakin ingin menghapus data pernikahan ini?")) {
+            sendPost('deleteMarriage', { marriage_id: id });
+        }
     }
 
     function submitChildRelation() {
@@ -199,14 +255,28 @@
         .then(res => res.json())
         .then(data => {
             alert(data.message);
+            resetPersonForm();
             fetchDataAndRender();
         });
     }
 
     function renderFamilyTree(data) {
         let container = document.getElementById('tree-container');
+        let isAdmin = localStorage.getItem('authToken') !== null;
+
         if(!data.marriages || data.marriages.length === 0) {
-            container.innerHTML = "<p>Belum ada data pernikahan/keluarga yang tercatat.</p>";
+            let html = "<p>Belum ada data pernikahan/keluarga yang tercatat.</p>";
+            // Tetap tampilkan daftar semua anggota jika admin login meskipun belum ada pernikahan
+            if(isAdmin && data.persons.length > 0) {
+                html += `<hr style="margin: 20px 0;"><h3>Daftar Semua Anggota Keluarga (Manajemen Data)</h3><ul>`;
+                data.persons.forEach(p => {
+                    html += `<li style="margin-bottom: 6px;">${p.full_name} (${p.gender}) 
+                             <button onclick="editPerson(${p.person_id})" style="padding: 2px 6px; font-size: 11px; margin-left: 5px;">Edit</button>
+                             <button onclick="deletePerson(${p.person_id})" style="padding: 2px 6px; font-size: 11px; background-color: #d9534f; margin-left: 2px;">Hapus</button></li>`;
+                });
+                html += `</ul>`;
+            }
+            container.innerHTML = html;
             return;
         }
 
@@ -218,24 +288,40 @@
             let hName = husband ? husband.full_name : `[ID ${m.husband_id}]`;
             let wName = wife ? wife.full_name : `[ID ${m.wife_id}]`;
 
-            html += `<div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px; background: #fafafa;">`;
-            html += `<strong>Pasangan:</strong> 👤 ${hName} (Suami) 💍 ${wName} (Istri) <br><small>Status: ${m.status_pernikahan}</small>`;
+            html += `<div style="border: 1px solid #ddd; padding: 12px; margin-bottom: 12px; border-radius: 6px; background: #fafafa;">`;
+            html += `<div style="display: flex; justify-content: space-between; align-items: center;">`;
+            html += `<div><strong>Pasangan:</strong> 👤 ${hName} 💍 ${wName} <br><small>Status Nikah: ${m.status_pernikahan}</small></div>`;
             
-            // Cari anak dari pernikahan ini
+            if(isAdmin) {
+                html += `<div><button onclick="deleteMarriage(${m.marriage_id})" style="background-color: #d9534f; padding: 5px 10px; font-size: 12px;">Hapus Nikah</button></div>`;
+            }
+            html += `</div>`;
+            
+            // Anak-anak
             let children = data.parent_child.filter(pc => pc.marriage_id == m.marriage_id);
             if(children.length > 0) {
-                html += `<div style="margin-left: 20px; margin-top: 5px;"><strong>Anak-anak:</strong><ul>`;
+                html += `<div style="margin-left: 20px; margin-top: 8px;"><strong>Anak-anak:</strong><ul>`;
                 children.forEach(c => {
                     let childObj = data.persons.find(p => p.person_id == c.child_id);
                     let cName = childObj ? childObj.full_name : `[ID ${c.child_id}]`;
-                    html += `<li>👶 ${cName} (${childObj ? childObj.gender : 'N/A'})</li>`;
+                    let editBtn = isAdmin && childObj ? ` <button onclick="editPerson(${childObj.person_id})" style="padding: 2px 6px; font-size: 10px; margin-left: 5px;">Edit</button> <button onclick="deletePerson(${childObj.person_id})" style="padding: 2px 6px; font-size: 10px; background-color: #d9534f; margin-left: 2px;">Hapus</button>` : '';
+                    html += `<li>👶 ${cName} (${childObj ? childObj.gender : 'N/A'})${editBtn}</li>`;
                 });
                 html += `</ul></div>`;
-            } else {
-                html += `<div style="margin-left: 20px; margin-top: 5px;"><small style="color: #777;">Belum ada anak tercatat dari pernikahan ini.</small></div>`;
             }
             html += `</div>`;
         });
+
+        // Tampilkan daftar semua individu untuk memudahkan Edit/Delete individual
+        if(isAdmin && data.persons.length > 0) {
+            html += `<hr style="margin: 30px 0;"><h3>Daftar Semua Anggota Keluarga (Manajemen Data)</h3><ul>`;
+            data.persons.forEach(p => {
+                html += `<li style="margin-bottom: 6px;">${p.full_name} (${p.gender}) 
+                         <button onclick="editPerson(${p.person_id})" style="padding: 2px 6px; font-size: 11px; margin-left: 5px;">Edit</button>
+                         <button onclick="deletePerson(${p.person_id})" style="padding: 2px 6px; font-size: 11px; background-color: #d9534f; margin-left: 2px;">Hapus</button></li>`;
+            });
+            html += `</ul>`;
+        }
 
         container.innerHTML = html;
     }
