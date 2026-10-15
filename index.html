@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Silsilah Keluarga Management</title>
+    <!-- Memanggil CSS Terpisah -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>Sistem Silsilah Keluarga</h1>
+
+    <!-- Bagian Login Admin -->
+    <div id="login-section" class="card">
+        <h2>Login Admin</h2>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="loginAdmin()">Login</button>
+        <p id="login-msg" style="color: red;"></p>
+    </div>
+
+    <!-- Bagian Dashboard CRUD & Visualisasi (Tersembunyi sebelum login) -->
+    <div id="dashboard-section" class="card hidden">
+        <h2>Panel Kontrol Admin</h2>
+        <button onclick="logout()">Logout</button>
+        <hr>
+        <h3>Tambah Anggota Keluarga Baru</h3>
+        <input type="text" id="full_name" placeholder="Nama Lengkap">
+        <select id="gender">
+            <option value="L">Laki-laki</option>
+            <option value="P">Perempuan</option>
+        </select>
+        <input type="date" id="birth_date" placeholder="Tanggal Lahir">
+        <input type="text" id="birth_place" placeholder="Tempat Lahir">
+        <select id="status_hidup">
+            <option value="Hidup">Hidup</option>
+            <option value="Meninggal">Meninggal</option>
+        </select>
+        <button onclick="addPerson()">Simpan Data</button>
+    </div>
+
+    <!-- Bagian Pohon Keluarga / Visualisasi -->
+    <div class="card">
+        <h2>Bagan Silsilah</h2>
+        <div id="tree-container">Memuat data silsilah...</div>
+    </div>
+</div>
+
+<!-- JavaScript Utama -->
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbwH1mNv6c2wbCxl6W-_3GWtgVMx0-RGWVAOZQlbeSfXKktOMxBOG9NS0xos6SG9fpY0/exec";
+
+    function loginAdmin() {
+        const u = document.getElementById('username').value;
+        const p = document.getElementById('password').value;
+
+        fetch(`${API_URL}?action=login&username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    localStorage.setItem('authToken', data.token);
+                    document.getElementById('login-section').classList.add('hidden');
+                    document.getElementById('dashboard-section').classList.remove('hidden');
+                    alert('Login Berhasil!');
+                } else {
+                    document.getElementById('login-msg').innerText = data.message;
+                }
+            });
+    }
+
+    function logout() {
+        localStorage.removeItem('authToken');
+        location.reload();
+    }
+
+    // Ambil data untuk ditampilkan
+    window.onload = function() {
+        fetch(`${API_URL}?action=getData`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    let html = "<ul>";
+                    data.persons.forEach(p => {
+                        html += `<li><b>${p.full_name}</b> (${p.gender}) - Lahir: ${p.birth_place}</li>`;
+                    });
+                    html += "</ul>";
+                    document.getElementById('tree-container').innerHTML = html;
+                }
+            });
+    }
+
+    function addPerson() {
+        const token = localStorage.getItem('authToken');
+        const payload = {
+            full_name: document.getElementById('full_name').value,
+            gender: document.getElementById('gender').value,
+            birth_date: document.getElementById('birth_date').value,
+            birth_place: document.getElementById('birth_place').value,
+            status_hidup: document.getElementById('status_hidup').value
+        };
+
+        fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'addPerson', token: token, payload: payload })
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message);
+            location.reload();
+        });
+    }
+</script>
+</body>
+</html>
