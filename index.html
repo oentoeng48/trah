@@ -4,13 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Silsilah Keluarga Management</title>
-    <!-- Memanggil CSS Terpisah -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="container">
-    <h1>Sistem Silsilah Keluarga</h1>
+    <h1>Sistem Silsilah Keluarga Terintegrasi</h1>
 
     <!-- Bagian Login Admin -->
     <div id="login-section" class="card">
@@ -21,36 +20,66 @@
         <p id="login-msg" style="color: red;"></p>
     </div>
 
-    <!-- Bagian Dashboard CRUD & Visualisasi (Tersembunyi sebelum login) -->
+    <!-- Bagian Dashboard Admin (CRUD Lengkap) -->
     <div id="dashboard-section" class="card hidden">
-        <h2>Panel Kontrol Admin</h2>
-        <button onclick="logout()">Logout</button>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Panel Kontrol Admin</h2>
+            <button onclick="logout()" style="background-color: #d9534f;">Logout</button>
+        </div>
         <hr>
-        <h3>Tambah Anggota Keluarga Baru</h3>
-        <input type="text" id="full_name" placeholder="Nama Lengkap">
-        <select id="gender">
+
+        <!-- 1. Form Tambah Orang -->
+        <h3>1. Tambah Anggota Keluarga</h3>
+        <input type="text" id="p_name" placeholder="Nama Lengkap">
+        <select id="p_gender">
             <option value="L">Laki-laki</option>
             <option value="P">Perempuan</option>
         </select>
-        <input type="date" id="birth_date" placeholder="Tanggal Lahir">
-        <input type="text" id="birth_place" placeholder="Tempat Lahir">
-        <select id="status_hidup">
+        <input type="date" id="p_birth" placeholder="Tanggal Lahir">
+        <input type="text" id="p_place" placeholder="Tempat Lahir">
+        <select id="p_status">
             <option value="Hidup">Hidup</option>
             <option value="Meninggal">Meninggal</option>
         </select>
-        <button onclick="addPerson()">Simpan Data</button>
+        <button onclick="submitPerson()">Simpan Orang</button>
+
+        <hr style="margin: 20px 0;">
+
+        <!-- 2. Form Tambah Pernikahan -->
+        <h3>2. Tambah Hubungan Pernikahan (Suami & Istri)</h3>
+        <label>Pilih Suami:</label>
+        <select id="m_husband"><option value="">-- Pilih Suami --</option></select>
+        <label>Pilih Istri:</label>
+        <select id="m_wife"><option value="">-- Pilih Istri --</option></select>
+        <input type="date" id="m_date" placeholder="Tanggal Nikah">
+        <select id="m_status">
+            <option value="Aktif">Aktif</option>
+            <option value="Cerai">Cerai</option>
+            <option value="Pasangan Wafat">Pasangan Wafat</option>
+        </select>
+        <button onclick="submitMarriage()">Simpan Pernikahan</button>
+
+        <hr style="margin: 20px 0;">
+
+        <!-- 3. Form Tambah Anak ke Pernikahan -->
+        <h3>3. Hubungkan Anak ke Orang Tua (Pernikahan)</h3>
+        <label>Pilih Pernikahan Orang Tua:</label>
+        <select id="c_marriage"><option value="">-- Pilih Pernikahan --</option></select>
+        <label>Pilih Anak:</label>
+        <select id="c_child"><option value="">-- Pilih Anak --</option></select>
+        <button onclick="submitChildRelation()">Simpan Relasi Anak</button>
     </div>
 
-    <!-- Bagian Pohon Keluarga / Visualisasi -->
+    <!-- Bagian Tampilan Bagan Silsilah -->
     <div class="card">
-        <h2>Bagan Silsilah</h2>
+        <h2>Pohon / Bagan Silsilah Keluarga</h2>
         <div id="tree-container">Memuat data silsilah...</div>
     </div>
 </div>
 
-<!-- JavaScript Utama -->
 <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbwH1mNv6c2wbCxl6W-_3GWtgVMx0-RGWVAOZQlbeSfXKktOMxBOG9NS0xos6SG9fpY0/exec";
+    let globalData = {};
 
     function loginAdmin() {
         const u = document.getElementById('username').value;
@@ -61,8 +90,7 @@
             .then(data => {
                 if(data.status === 'success') {
                     localStorage.setItem('authToken', data.token);
-                    document.getElementById('login-section').classList.add('hidden');
-                    document.getElementById('dashboard-section').classList.remove('hidden');
+                    toggleAdminView(true);
                     alert('Login Berhasil!');
                 } else {
                     document.getElementById('login-msg').innerText = data.message;
@@ -72,44 +100,144 @@
 
     function logout() {
         localStorage.removeItem('authToken');
-        location.reload();
+        toggleAdminView(false);
     }
 
-    // Ambil data untuk ditampilkan
+    function toggleAdminView(isAdmin) {
+        if(isAdmin) {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('dashboard-section').classList.remove('hidden');
+            loadDropdownOptions();
+        } else {
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('dashboard-section').classList.add('hidden');
+        }
+    }
+
     window.onload = function() {
+        if(localStorage.getItem('authToken')) {
+            toggleAdminView(true);
+        }
+        fetchDataAndRender();
+    }
+
+    function fetchDataAndRender() {
         fetch(`${API_URL}?action=getData`)
             .then(res => res.json())
             .then(data => {
                 if(data.status === 'success') {
-                    let html = "<ul>";
-                    data.persons.forEach(p => {
-                        html += `<li><b>${p.full_name}</b> (${p.gender}) - Lahir: ${p.birth_place}</li>`;
-                    });
-                    html += "</ul>";
-                    document.getElementById('tree-container').innerHTML = html;
+                    globalData = data;
+                    renderFamilyTree(data);
+                    if(localStorage.getItem('authToken')) {
+                        populateDropdowns(data);
+                    }
                 }
             });
     }
 
-    function addPerson() {
-        const token = localStorage.getItem('authToken');
-        const payload = {
-            full_name: document.getElementById('full_name').value,
-            gender: document.getElementById('gender').value,
-            birth_date: document.getElementById('birth_date').value,
-            birth_place: document.getElementById('birth_place').value,
-            status_hidup: document.getElementById('status_hidup').value
-        };
+    function populateDropdowns(data) {
+        let husbandSelect = document.getElementById('m_husband');
+        let wifeSelect = document.getElementById('m_wife');
+        let childSelect = document.getElementById('c_child');
+        let marriageSelect = document.getElementById('c_marriage');
 
+        husbandSelect.innerHTML = '<option value="">-- Pilih Suami --</option>';
+        wifeSelect.innerHTML = '<option value="">-- Pilih Istri --</option>';
+        childSelect.innerHTML = '<option value="">-- Pilih Anak --</option>';
+        marriageSelect.innerHTML = '<option value="">-- Pilih Pernikahan --</option>';
+
+        data.persons.forEach(p => {
+            let opt = `<option value="${p.person_id}">${p.full_name} (${p.gender})</option>`;
+            if(p.gender === 'L') husbandSelect.innerHTML += opt;
+            if(p.gender === 'P') wifeSelect.innerHTML += opt;
+            childSelect.innerHTML += opt;
+        });
+
+        data.marriages.forEach(m => {
+            let suami = data.persons.find(p => p.person_id == m.husband_id)?.full_name || 'ID ' + m.husband_id;
+            let istri = data.persons.find(p => p.person_id == m.wife_id)?.full_name || 'ID ' + m.wife_id;
+            marriageSelect.innerHTML += `<option value="${m.marriage_id}">Pernikahan #${m.marriage_id}: ${suami} & ${istri}</option>`;
+        });
+    }
+
+    function submitPerson() {
+        const payload = {
+            full_name: document.getElementById('p_name').value,
+            gender: document.getElementById('p_gender').value,
+            birth_date: document.getElementById('p_birth').value,
+            birth_place: document.getElementById('p_place').value,
+            status_hidup: document.getElementById('p_status').value
+        };
+        sendPost('addPerson', payload);
+    }
+
+    function submitMarriage() {
+        const payload = {
+            husband_id: document.getElementById('m_husband').value,
+            wife_id: document.getElementById('m_wife').value,
+            marriage_date: document.getElementById('m_date').value,
+            status_pernikahan: document.getElementById('m_status').value
+        };
+        sendPost('addMarriage', payload);
+    }
+
+    function submitChildRelation() {
+        const payload = {
+            marriage_id: document.getElementById('c_marriage').value,
+            child_id: document.getElementById('c_child').value,
+            notes: 'Anak kandung'
+        };
+        sendPost('addChildRelation', payload);
+    }
+
+    function sendPost(action, payload) {
+        const token = localStorage.getItem('authToken');
         fetch(API_URL, {
             method: 'POST',
-            body: JSON.stringify({ action: 'addPerson', token: token, payload: payload })
+            body: JSON.stringify({ action: action, token: token, payload: payload })
         })
         .then(res => res.json())
         .then(data => {
             alert(data.message);
-            location.reload();
+            fetchDataAndRender();
         });
+    }
+
+    function renderFamilyTree(data) {
+        let container = document.getElementById('tree-container');
+        if(!data.marriages || data.marriages.length === 0) {
+            container.innerHTML = "<p>Belum ada data pernikahan/keluarga yang tercatat.</p>";
+            return;
+        }
+
+        let html = "";
+        data.marriages.forEach(m => {
+            let husband = data.persons.find(p => p.person_id == m.husband_id);
+            let wife = data.persons.find(p => p.person_id == m.wife_id);
+            
+            let hName = husband ? husband.full_name : `[ID ${m.husband_id}]`;
+            let wName = wife ? wife.full_name : `[ID ${m.wife_id}]`;
+
+            html += `<div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px; background: #fafafa;">`;
+            html += `<strong>Pasangan:</strong> 👤 ${hName} (Suami) 💍 ${wName} (Istri) <br><small>Status: ${m.status_pernikahan}</small>`;
+            
+            // Cari anak dari pernikahan ini
+            let children = data.parent_child.filter(pc => pc.marriage_id == m.marriage_id);
+            if(children.length > 0) {
+                html += `<div style="margin-left: 20px; margin-top: 5px;"><strong>Anak-anak:</strong><ul>`;
+                children.forEach(c => {
+                    let childObj = data.persons.find(p => p.person_id == c.child_id);
+                    let cName = childObj ? childObj.full_name : `[ID ${c.child_id}]`;
+                    html += `<li>👶 ${cName} (${childObj ? childObj.gender : 'N/A'})</li>`;
+                });
+                html += `</ul></div>`;
+            } else {
+                html += `<div style="margin-left: 20px; margin-top: 5px;"><small style="color: #777;">Belum ada anak tercatat dari pernikahan ini.</small></div>`;
+            }
+            html += `</div>`;
+        });
+
+        container.innerHTML = html;
     }
 </script>
 </body>
